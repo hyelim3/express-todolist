@@ -137,7 +137,7 @@ app.patch("/todos/check/:id", async (req, res) => {
     });
   }
   await pool.query(
-    //진짜 업데이트해줘야함
+    //진짜 업데이트해줘야함 //포스트맨
     `  
     UPDATE todo
     SET checked =?
@@ -145,7 +145,15 @@ app.patch("/todos/check/:id", async (req, res) => {
     `,
     [!todoRow.checked, id] //이전 상태를 체크 true를 불러왔으면 반전된 값이 들어옴
   );
-  console.log(todoRow);
+
+  const [updatedTodos] = await pool.query(
+    `
+    SELECT *
+    FROM todo
+    ORDER BY id DESC
+    `
+  );
+  res.json(updatedTodos);
 });
 
 // 할일 삭제
