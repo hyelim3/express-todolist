@@ -5,11 +5,14 @@ import express from "express";
 import mysql from "mysql2/promise";
 import cors from "cors";
 import axios from "axios";
+import path from "path";
+const __dirname = path.resolve();
 
 const app = express();
 
 app.use(cors());
 app.use(express.json()); //json을 쓸 수 있다 할 일 수정
+app.use(cors());
 
 const port = 4000;
 const pool = mysql.createPool({
@@ -53,7 +56,7 @@ app.get("/todos", async (req, res) => {
 
 app.get("/todos/:id", async (req, res) => {
   const { id } = req.params;
-  const [[rows]] = await pool.query(
+  const [[todo]] = await pool.query(
     `
     select *
     from todo
@@ -61,13 +64,47 @@ app.get("/todos/:id", async (req, res) => {
     `,
     [id]
   );
-  res.json(rows);
+  if (!todo) {
+    res.status(404).json({
+      msg: "not found",
+    });
+    return;
+  }
+  res.json(todo);
+});
+
+//추가
+app.post("/todos", async (req, res) => {
+  const {
+    body: { text },
+  } = req;
+  console.log(text);
+
+  await pool.query(
+    `
+    INSERT INTO todo
+    SET reg_date = NOW(),
+    perform_date = '2022-08-12 12:13:14',
+    checked = 0,
+    text = ?
+    `,
+    [text]
+  );
+
+  const [updatedTodos] = await pool.query(
+    `
+    SELECT *
+    FROM todo
+    ORDER BY id DESC
+    `
+  );
+  res.json(updatedTodos);
 });
 
 // 할 일 수정
 app.patch("/todos/:id", async (req, res) => {
   const { id } = req.params;
-  const { perform_date, content } = req.body;
+  const { perform_date, text } = req.body;
 
   const [rows] = await pool.query(
     `
@@ -91,9 +128,9 @@ app.patch("/todos/:id", async (req, res) => {
     return;
   }
 
-  if (!content) {
+  if (!text) {
     res.status(400).json({
-      msg: "content required",
+      msg: "text required",
     });
     return;
   }
@@ -102,15 +139,21 @@ app.patch("/todos/:id", async (req, res) => {
     `
     update todo
     set perform_date =?,
-    content = ?
+    text = ?
     where id =?
     `,
-    [perform_date, content, id]
+    [perform_date, text, id]
   );
 
-  res.json({
-    msg: `${id}번 할일이 수정되었습니다.`,
-  });
+  const [updatedTodos] = await pool.query(
+    `
+    SELECT *
+    FROM todo
+    ORDER BY id DESC
+    `
+  );
+
+  res.json(updatedTodos);
 });
 
 // 받아오는 거 확인
@@ -135,6 +178,7 @@ app.patch("/todos/check/:id", async (req, res) => {
       //에러처리
       msg: "not fount",
     });
+    return;
   }
   await pool.query(
     //진짜 업데이트해줘야함 //포스트맨
@@ -152,6 +196,42 @@ app.patch("/todos/check/:id", async (req, res) => {
     FROM todo
     ORDER BY id DESC
     `
+  );
+  res.json(updatedTodos); //react(보낸사람)한테 반환해줌
+});
+
+app.delete("/todos/check/:id", async (req, res) => {
+  const { id } = req.params;
+  const [[todoRow]] = await pool.query(
+    `
+    SELECT *
+    FROM todo
+    WHERE id = ?
+    `,
+    [id]
+  );
+  if (todoRow === undefined) {
+    res.status(404).json({
+      msg: "not found",
+    });
+    return;
+  }
+
+  await pool.query(
+    `
+  DELETE
+  FROM todo 
+  WHERE id = ? `,
+    [id]
+  );
+
+  const [updatedTodos] = await pool.query(
+    `
+    SELECT *
+    FROM todo
+    ORDER BY id DESC
+    `,
+    [id]
   );
   res.json(updatedTodos);
 });
